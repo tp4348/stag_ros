@@ -32,6 +32,7 @@ SOFTWARE.
 
 // ROS msgs
 #include "sensor_msgs/image_encodings.h"
+#include "geometry_msgs/PoseStamped.h"
 
 // Stag includes
 #include "stag/Stag.h"
@@ -46,11 +47,11 @@ class StagNode {
  private:
   // Callbacks
   void imageCallback(const sensor_msgs::ImageConstPtr &msg);
+  void markersArrayCallback(const geometry_msgs::PoseStampedConstPtr &msg);
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg);
 
   // Functions
   void loadParameters();
-  bool getBundleIndex(const int id, int &bundle_index, int &tag_index);
   bool getTagIndex(const int id, int &tag_index);
 
   // STag handle
@@ -61,11 +62,12 @@ class StagNode {
   // ROS Subcribers
   image_transport::Subscriber imageSub;
   ros::Subscriber cameraInfoSub;
+  ros::Subscriber markersSub;
 
   // ROS Publishers
   image_transport::Publisher imageDebugPub;
-  ros::Publisher bundlePub;
   ros::Publisher markersPub;
+  ros::Publisher markersArrayPub;
 
   // Data
   cv::Mat cameraMatrix;
@@ -78,6 +80,7 @@ class StagNode {
   bool is_compressed;
   std::string image_topic;
   std::string camera_info_topic;
+  std::string markers_topic;
   std::string tag_tf_prefix;
 
   // Tag and bundle info

@@ -39,6 +39,9 @@ SOFTWARE.
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <vision_msgs/Detection2D.h>
+#include <vision_msgs/Detection2DArray.h>
+#include <vision_msgs/ObjectHypothesisWithPose.h>
 
 #include <stdexcept>
 #include <iostream>
@@ -65,12 +68,14 @@ StagNode::StagNode(ros::NodeHandle &nh,
       image_transport::TransportHints(is_compressed ? "compressed" : "raw"));
   cameraInfoSub =
       nh.subscribe(camera_info_topic, 1, &StagNode::cameraInfoCallback, this);
+  markersSub =
+      nh.subscribe(markers_topic, 1, &StagNode::markersArrayCallback, this);
 
   // Set Publishers
   if (debug_images)
     imageDebugPub = imageT.advertise("stag_ros/image_markers", 1);
-  bundlePub = nh.advertise<geometry_msgs::PoseStamped>("stag_ros/bundles", 1);
-  markersPub = nh.advertise<geometry_msgs::PoseStamped>("stag_ros/markers", 1);
+  markersPub = nh.advertise<geometry_msgs::PoseStamped>(markers_topic, 1);
+  markersArrayPub = nh.advertise<vision_msgs::Detection2DArray>("stag_ros/markers_array", 1);
 
 
   // Initialize camera info
@@ -92,6 +97,8 @@ void StagNode::loadParameters() {
   nh_lcl.param("raw_image_topic", image_topic, std::string("image_raw"));
   nh_lcl.param("camera_info_topic", camera_info_topic,
                std::string("camera_info"));
+  nh_lcl.param("markers_topic", markers_topic,
+               std::string("stag_ros/markers"));
   nh_lcl.param("is_compressed", is_compressed, false);
   nh_lcl.param("show_markers", debug_images, false);
   nh_lcl.param("publish_tf", publish_tf, false);
@@ -105,19 +112,6 @@ bool StagNode::getTagIndex(const int id, int &tag_index) {
     if (tags[i].id == id) {
       tag_index = i;
       return true;
-    }
-  }
-  return false;  // not found
-}
-
-bool StagNode::getBundleIndex(const int id, int &bundle_index, int &tag_index) {
-  for (int bi = 0; bi < bundles.size(); ++bi) {
-    for (int ti = 0; ti < bundles[bi].tags.size(); ++ti) {
-      if (bundles[bi].tags[ti].id == id) {
-        bundle_index = bi;
-        tag_index = ti;
-        return true;
-      }
     }
   }
   return false;  // not found
@@ -150,16 +144,14 @@ void StagNode::imageCallback(const sensor_msgs::ImageConstPtr &msg) {
 
     // For each marker in the list
     if (markers.size() > 0) {
+      ROS_INFO("STag: Marker detected");
       // Create markers msg
       std::vector<cv::Mat> tag_pose(tags.size(), cv::Mat::zeros(3, 4, CV_64F));
-      std::vector<cv::Mat> bundle_pose(bundles.size(), cv::Mat::zeros(3, 4, CV_64F));
-      std::vector<std::vector<cv::Point2d>> bundle_image(bundles.size());
-      std::vector<std::vector<cv::Point3d>> bundle_world(bundles.size());
+
+      // Create marker msg
+      int tag_index;
 
       for (int i = 0; i < markers.size(); i++) {
-        // Create marker msg
-        int tag_index, bundle_index;
-
         // if tag is a single tag, push back
         if (getTagIndex(markers[i].id, tag_index)) {
           std::vector<cv::Point2d> tag_image(5);
@@ -178,70 +170,55 @@ void StagNode::imageCallback(const sensor_msgs::ImageConstPtr &msg) {
                                  cameraMatrix, distortionMat);
           tag_pose[tag_index] = marker_pose;
 
-        } else if (getBundleIndex(markers[i].id, bundle_index, tag_index)) {
-          bundle_image[bundle_index].push_back(markers[i].center);
-          bundle_world[bundle_index].push_back(
-              bundles[bundle_index].tags[tag_index].center);
-
-          for (size_t ci = 0; ci < 4; ++ci) {
-            bundle_image[bundle_index].push_back(markers[i].corners[ci]);
-            bundle_world[bundle_index].push_back(
-                bundles[bundle_index].tags[tag_index].corners[ci]);
-          }
-        }
+        } else {
+	  ROS_WARN("STag: No corresponding tag detected ID");
+	  return;
+	}
       }
 
-      for (size_t bi = 0; bi < bundles.size(); ++bi) {
-        if (bundle_image[bi].size() > 0) {
-          cv::Mat b_pose = cv::Mat::zeros(3, 4, CV_64F);
-          Common::solvePnpBundle(bundle_image[bi], bundle_world[bi], b_pose,
-                                 cameraMatrix, distortionMat);
-          bundle_pose[bi] = b_pose;
-        }
-      }
+      if (tag_pose[tag_index].empty()) return;
 
-      for (size_t bi = 0; bi < bundles.size(); ++bi) {
-        if (bundle_pose[bi].empty()) continue;
+      tf::Matrix3x3 rotMat(
+	  tag_pose[tag_index].at<double>(0, 0), tag_pose[tag_index].at<double>(0, 1),
+	  tag_pose[tag_index].at<double>(0, 2), tag_pose[tag_index].at<double>(1, 0),
+	  tag_pose[tag_index].at<double>(1, 1), tag_pose[tag_index].at<double>(1, 2),
+	  tag_pose[tag_index].at<double>(2, 0), tag_pose[tag_index].at<double>(2, 1),
+	  tag_pose[tag_index].at<double>(2, 2));
+      tf::Quaternion rotQ;
+      rotMat.getRotation(rotQ);
 
-        tf::Matrix3x3 rotMat(
-            bundle_pose[bi].at<double>(0, 0), bundle_pose[bi].at<double>(0, 1),
-            bundle_pose[bi].at<double>(0, 2), bundle_pose[bi].at<double>(1, 0),
-            bundle_pose[bi].at<double>(1, 1), bundle_pose[bi].at<double>(1, 2),
-            bundle_pose[bi].at<double>(2, 0), bundle_pose[bi].at<double>(2, 1),
-            bundle_pose[bi].at<double>(2, 2));
-        tf::Quaternion rotQ;
-        rotMat.getRotation(rotQ);
-
-        tf::Vector3 tfVec(bundle_pose[bi].at<double>(0, 3),
-                          bundle_pose[bi].at<double>(1, 3),
-                          bundle_pose[bi].at<double>(2, 3));
-        auto bundle_tf = tf::Transform(rotQ, tfVec);
-        Common::publishTransform(bundle_tf, bundlePub, msg->header,
-                                 tag_tf_prefix, bundles[bi].frame_id,
-                                 publish_tf);
-      }
-      for (size_t ti = 0; ti < tags.size(); ++ti) {
-        if (tag_pose[ti].empty()) continue;
-
-        tf::Matrix3x3 rotMat(
-            tag_pose[ti].at<double>(0, 0), tag_pose[ti].at<double>(0, 1),
-            tag_pose[ti].at<double>(0, 2), tag_pose[ti].at<double>(1, 0),
-            tag_pose[ti].at<double>(1, 1), tag_pose[ti].at<double>(1, 2),
-            tag_pose[ti].at<double>(2, 0), tag_pose[ti].at<double>(2, 1),
-            tag_pose[ti].at<double>(2, 2));
-        tf::Quaternion rotQ;
-        rotMat.getRotation(rotQ);
-
-        tf::Vector3 tfVec(tag_pose[ti].at<double>(0, 3),
-                          tag_pose[ti].at<double>(1, 3),
-                          tag_pose[ti].at<double>(2, 3));
-        auto marker_tf = tf::Transform(rotQ, tfVec);
-        Common::publishTransform(marker_tf, markersPub, msg->header,
-                                 tag_tf_prefix, tags[ti].frame_id, publish_tf);
-      }
-    } else
-      ROS_WARN("No markers detected");
+      tf::Vector3 tfVec(tag_pose[tag_index].at<double>(0, 3),
+			tag_pose[tag_index].at<double>(1, 3),
+			tag_pose[tag_index].at<double>(2, 3));
+      auto marker_tf = tf::Transform(rotQ, tfVec);
+      Common::publishTransform(marker_tf, markersPub, msg->header,
+			       tag_tf_prefix, tags[tag_index].frame_id, publish_tf);
+    } else { 
+	ROS_WARN("No markers detected"); 
+    }
   }
+}
+
+void StagNode::markersArrayCallback(const geometry_msgs::PoseStampedConstPtr &msg) {
+  vision_msgs::Detection2DArray array;
+  array.header = msg->header;
+
+  vision_msgs::Detection2D markerobj;
+  vision_msgs::ObjectHypothesisWithPose marker;
+  marker.pose.pose = msg->pose;
+
+  size_t i = 0;
+  std::string frame = msg->header.frame_id;
+  for ( ; i < frame.length() ; i++) {
+    if (std::isdigit(frame[i])) break;
+  }
+  std::string id = frame.substr(i, frame.length() - 1);
+  marker.id = stoi(id);
+
+  markerobj.results.push_back(marker);
+  array.detections.push_back(markerobj);
+
+  markersArrayPub.publish(array);
 }
 
 void StagNode::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg) {

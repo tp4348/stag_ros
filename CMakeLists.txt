@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 2.8.3)
 project(stag_ros)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   camera_info_manager
   cv_bridge
   geometry_msgs
+  vision_msgs
   image_transport
   nodelet
   roscpp
@@ -77,9 +78,11 @@ add_executable(stag_nodelet_runnable
 ## Dependencies
 add_dependencies(stag_nodelet
   ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
 )
 add_dependencies(stag_node
   ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
 )
 
 ## Links

@@ -1,10 +1,10 @@
 # STag parameters
-libraryHD: 15
+libraryHD: 13
 errorCorrection: 7
 
 # Camera configuration
-camera_info_topic: /usb_cam/camera_info
-raw_image_topic: /usb_cam/image_raw
+camera_info_topic: /raspicam_node/camera_info
+raw_image_topic: /raspicam_node/image
 is_compressed: true
 
 # Node configuration
