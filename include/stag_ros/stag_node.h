@@ -33,6 +33,7 @@ SOFTWARE.
 // ROS msgs
 #include "sensor_msgs/image_encodings.h"
 #include "geometry_msgs/PoseStamped.h"
+#include "vision_msgs/Detection2D.h"
 
 // Stag includes
 #include "stag/Stag.h"
@@ -81,9 +82,11 @@ class StagNode {
   std::string image_topic;
   std::string camera_info_topic;
   std::string markers_topic;
+  std::string markers_array_topic;
   std::string tag_tf_prefix;
 
   // Tag and bundle info
+  std::map<std::string, vision_msgs::Detection2D> markersFrames;
   std::vector<Bundle> bundles;
   std::vector<Tag> tags;
 };

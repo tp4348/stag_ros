@@ -75,7 +75,7 @@ StagNode::StagNode(ros::NodeHandle &nh,
   if (debug_images)
     imageDebugPub = imageT.advertise("stag_ros/image_markers", 1);
   markersPub = nh.advertise<geometry_msgs::PoseStamped>(markers_topic, 1);
-  markersArrayPub = nh.advertise<vision_msgs::Detection2DArray>("stag_ros/markers_array", 1);
+  markersArrayPub = nh.advertise<vision_msgs::Detection2DArray>(markers_array_topic, 1);
 
 
   // Initialize camera info
@@ -99,6 +99,8 @@ void StagNode::loadParameters() {
                std::string("camera_info"));
   nh_lcl.param("markers_topic", markers_topic,
                std::string("stag_ros/markers"));
+  nh_lcl.param("markers_array_topic", markers_array_topic,
+               std::string("stag_ros/markers_array"));
   nh_lcl.param("is_compressed", is_compressed, false);
   nh_lcl.param("show_markers", debug_images, false);
   nh_lcl.param("publish_tf", publish_tf, false);
@@ -200,25 +202,35 @@ void StagNode::imageCallback(const sensor_msgs::ImageConstPtr &msg) {
 }
 
 void StagNode::markersArrayCallback(const geometry_msgs::PoseStampedConstPtr &msg) {
-  vision_msgs::Detection2DArray array;
-  array.header = msg->header;
+  std::map<std::string, vision_msgs::Detection2D>::iterator it = markersFrames.find(msg->header.frame_id);
+  if (it == markersFrames.end()) { 
+    vision_msgs::Detection2D markerobj;
+    markerobj.header = msg->header;
+    vision_msgs::ObjectHypothesisWithPose marker;
+    marker.pose.pose = msg->pose;
 
-  vision_msgs::Detection2D markerobj;
-  vision_msgs::ObjectHypothesisWithPose marker;
-  marker.pose.pose = msg->pose;
+    // String tokenization ~ ID from frame
+    size_t i = 0;
+    std::string frame = msg->header.frame_id;
+    for ( ; i < frame.length() ; i++) {
+      if (std::isdigit(frame[i])) break;
+    }
+    std::string id = frame.substr(i, frame.length() - 1);
+    marker.id = stoi(id);
 
-  size_t i = 0;
-  std::string frame = msg->header.frame_id;
-  for ( ; i < frame.length() ; i++) {
-    if (std::isdigit(frame[i])) break;
+    markerobj.results.push_back(marker);
+    markersFrames.insert(std::pair<std::string, vision_msgs::Detection2D>(msg->header.frame_id, markerobj));
+  }else {
+    vision_msgs::Detection2DArray array;
+    array.header.stamp = ros::Time::now();
+    
+    for (const auto &d : markersFrames) {
+        array.detections.push_back(d.second);
+    }
+    markersFrames.clear();
+
+    markersArrayPub.publish(array);
   }
-  std::string id = frame.substr(i, frame.length() - 1);
-  marker.id = stoi(id);
-
-  markerobj.results.push_back(marker);
-  array.detections.push_back(markerobj);
-
-  markersArrayPub.publish(array);
 }
 
 void StagNode::cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &msg) {
