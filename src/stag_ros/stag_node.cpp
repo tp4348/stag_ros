@@ -102,7 +102,7 @@ void StagNode::loadParameters() {
   nh_lcl.param("markers_array_topic", markers_array_topic,
                std::string("stag_ros/markers_array"));
   nh_lcl.param("is_compressed", is_compressed, false);
-  nh_lcl.param("show_markers", debug_images, false);
+  nh_lcl.param("show_markers", debug_images, true);
   nh_lcl.param("publish_tf", publish_tf, false);
   nh_lcl.param("tag_tf_prefix", tag_tf_prefix, std::string("STag_"));
 
