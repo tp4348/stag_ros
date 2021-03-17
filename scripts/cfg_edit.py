@@ -25,8 +25,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            cfgPath = str(raw_input(
-                "Enter the path to the single_config.yaml (or leave empty for default - %s): --> " % defaultCfgPath))
+            cfgPath = str(raw_input("Enter the path to the single_config.yaml (or leave empty for default - %s): --> " % defaultCfgPath))
             if not cfgPath:
                 cfgPath = defaultCfgPath
             if not os.path.isfile(cfgPath):
