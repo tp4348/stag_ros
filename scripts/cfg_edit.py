@@ -2,6 +2,7 @@ import yaml
 import os
 import sys
 import imp
+import rospkg
 
 em = None
 for path in sys.path:
@@ -16,12 +17,16 @@ else:
         "ERROR: could not find module em, please sudo apt install python-empy")
     exit(2)
 
-defaultCfgPath = "../cfg/single_config.yaml"
 
 if __name__ == '__main__':
+
+    r = rospkg.RosPack()
+    defaultCfgPath = os.path.join(r.get_path('stag_ros'), "cfg/single_config.yaml")
+
     while True:
         try:
-            cfgPath = str(raw_input("Enter the path to the single_config.yaml (or leave empty for default - %s): --> " % defaultCfgPath))
+            cfgPath = str(raw_input(
+                "Enter the path to the single_config.yaml (or leave empty for default - %s): --> " % defaultCfgPath))
             if not cfgPath:
                 cfgPath = defaultCfgPath
             if not os.path.isfile(cfgPath):
@@ -51,12 +56,11 @@ if __name__ == '__main__':
         else:
             break
 
-
     halfMarkerSize = markerSize / 2.0
 
     inner = ""
 
-    for i in range(numMarkers + 1): # Sometimes first marker have id 0, sometimes 1. This enables both possibilities.
+    for i in range(1, numMarkers + 1):
 
         s = em.expand("""    {
       frame: "tag_@(id)",
@@ -70,15 +74,12 @@ if __name__ == '__main__':
 """, {"id": i, "halfMarkerSize": halfMarkerSize})
 
         inner += s
-        
-    inner = inner[:-2] # remove final ",\n"
+
+    inner = inner[:-2]  # remove final ",\n"
 
     out = em.expand("""tags:
   [
 @(str)
-  ]
-bundles:
-  [
   ]
 
 # Marker corner order:
@@ -91,7 +92,6 @@ bundles:
 # 4          3
 
     """, {"str": inner})
-    
 
     f = open(defaultCfgPath, "w")
     f.write(out)
