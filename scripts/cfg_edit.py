@@ -39,7 +39,20 @@ if __name__ == '__main__':
 
     while True:
         try:
-            numMarkers = input("Enter the number of markers: --> ")
+            firstId = str(raw_input("Enter the first id (or leave empty for default - 1): --> "))
+            if not firstId:
+                firstId = 1
+            else:
+                firstId = int(firstId)
+        except (ValueError, NameError, SyntaxError):
+            print("Sorry, your input was wrong.")
+            continue
+        else:
+            break
+
+    while True:
+        try:
+            lastId = input("Enter the last id: --> ")
         except (ValueError, NameError, SyntaxError):
             print("Sorry, your input was wrong.")
             continue
@@ -59,7 +72,7 @@ if __name__ == '__main__':
 
     inner = ""
 
-    for i in range(1, numMarkers + 1):
+    for i in range(firstId, lastId + 1):
 
         s = em.expand("""    {
       frame: "tag_@(id)",
