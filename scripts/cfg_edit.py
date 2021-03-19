@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            cfgPath = str(raw_input("Enter the path to the single_config.yaml (or leave empty for default - %s): --> " % defaultCfgPath))
+            cfgPath = raw_input("Enter the path to the single_config.yaml (or leave empty for default - %s): --> " % defaultCfgPath)
             if not cfgPath:
                 cfgPath = defaultCfgPath
             if not os.path.isfile(cfgPath):
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            firstId = str(raw_input("Enter the first id (or leave empty for default - 1): --> "))
+            firstId = raw_input("Enter the first id (or leave empty for default - 1): --> ")
             if not firstId:
                 firstId = 1
             else:
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            markerSize = input("Enter the size of markers in meters: --> ")
+            markerSize = float(raw_input("Enter the size of markers in meters: --> ").replace(",", "."))
         except (ValueError, NameError, SyntaxError):
             print("Sorry, your input was wrong.")
             continue
