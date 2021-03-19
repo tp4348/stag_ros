@@ -73,7 +73,6 @@ if __name__ == '__main__':
     inner = ""
 
     for i in range(firstId, lastId + 1):
-
         s = em.expand("""    {
       frame: "tag_@(id)",
       id: @(id),
